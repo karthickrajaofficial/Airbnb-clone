@@ -2,6 +2,9 @@
 
 Full-stack Airbnb clone using the MERN stack, Tailwind CSS, and JWT authentication.
 
+Deployment
+The live version of the project is available at https://karthick-booking-app.vercel.app/.
+
 ## Overview
 
 Welcome to the Airbnb Clone project! This application is a full-stack implementation that mimics essential features of the Airbnb platform. Users can sign up, log in, browse property listings, make bookings, and leave reviews.
@@ -73,5 +76,3 @@ To sign up, visit /signup.
 To log in, visit /login.
 Use JWT tokens for authentication.
 
-Deployment
-The live version of the project is available at https://karthick-booking-app.vercel.app/.
