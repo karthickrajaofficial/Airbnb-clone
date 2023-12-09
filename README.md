@@ -55,3 +55,23 @@ git clone https://github.com/karthickrajaofficial/Airbnb-clone.git
 cd Airbnb-clone
 cd client && npm install
 cd ../server && npm install
+
+
+Usage
+Running the Application
+Start the frontend and backend servers:
+
+bash
+# Frontend
+cd client && yarn start (yarn run dev)
+
+# Backend
+cd ../server && npm start {nodemon index.js)
+
+Authentication
+To sign up, visit /signup.
+To log in, visit /login.
+Use JWT tokens for authentication.
+
+Deployment
+The live version of the project is available at https://karthick-booking-app.vercel.app/.
