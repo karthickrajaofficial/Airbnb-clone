@@ -9,7 +9,7 @@ const [checkIn,setCheckIn] = useState('')
 const [checkOut,setCheckOut] = useState('')
 const [nuberOfGuests,setNumberOfGuests] = useState(1)
 const [name,setName] = useState('')
-const [mobile,setMobile] = useState('')
+const [phone,setPhone] = useState('')
 const [redirect,setRedirect] = useState('')
 const {user} = useContext(UserContext)
 
@@ -26,7 +26,7 @@ if (checkIn && checkOut) {
 
 async function bookThisPlace(){
 const response = await axios.post('/bookings',{
-  checkIn,checkOut,name,mobile,nuberOfGuests,
+  checkIn,checkOut,name,phone,nuberOfGuests,
   place:place._id,price:numberOfNights * place.price,
 });
 const bookingId = response.data._id;
@@ -65,8 +65,8 @@ if (redirect){
                <input type="text" value={name} 
                 onChange={ev=>setName(ev.target.value)} />
                <label>Your Mobile No :</label>
-               <input type="tel" value={mobile} 
-                onChange={ev=>setMobile(ev.target.value)} />
+               <input type="tel" value={phone} 
+                onChange={ev=>setPhone(ev.target.value)} />
              </div>
             )}
           </div>

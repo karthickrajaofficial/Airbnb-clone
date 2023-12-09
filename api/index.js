@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('./models/User.js');
@@ -8,32 +8,46 @@ const Place = require('./models/Place.js');
 const Booking = require('./models/Booking.js');
 const cookieParser = require('cookie-parser');
 const imageDownloader = require('image-downloader');
-const {S3Client, PutObjectCommand} = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const multer = require('multer');
 const fs = require('fs');
 const mime = require('mime-types');
-
 require('dotenv').config();
+
 const app = express();
 
 const bcryptSalt = bcrypt.genSaltSync(10);
-const jwtSecret = process.env.JWT_SECRET || 'fallbackSecretKey';
+const jwtSecret =  'qwerty';
 const bucket = 'booking-appkarthick';
+
+// Connect to MongoDB when the application starts
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => {
+    console.log('Connected to MongoDB');
+  })
+  .catch((err) => {
+    console.error('Error connecting to MongoDB:', err);
+  });
+
+// ...
 
 app.use(express.json());
 app.use(cookieParser());
-app.use('/uploads', express.static(__dirname+'/uploads'));
-
-// Define the allowed origins
-const allowedOrigins = [
-  'http://localhost:5173',   // Add your local development origin
-  'https://bookingapp-airbnb-asqg9vf81-karthicks-projects-cbf42c4b.vercel.app',
-];
-
+app.use('/uploads', express.static(__dirname + '/uploads'));
 app.use(cors({
   credentials: true,
-  origin: 'http://localhost:5173',
+  origin: true,
 }));
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something went wrong!');
+});
+
+app.get('/test', async (req, res) => {
+  res.json('test ok');
+});
 
 
 async function uploadToS3(path, originalFilename, mimetype) {
@@ -66,13 +80,12 @@ function getUserDataFromReq(req) {
   });
 }
 
-
-app.get('/api/test', (req,res) => {
+app.get('/test', (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   res.json('test ok');
 });
 
-app.post('/api/register', async (req,res) => {
+app.post('/register', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const {name,email,password} = req.body;
 
@@ -89,7 +102,7 @@ app.post('/api/register', async (req,res) => {
 
 });
 
-app.post('/api/login', async (req,res) => {
+app.post('/login', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const {email,password} = req.body;
   const userDoc = await User.findOne({email});
@@ -110,26 +123,31 @@ app.post('/api/login', async (req,res) => {
     res.json('not found');
   }
 });
-app.get('/api/profile', (req,res) => {
+
+app.get('/profile', async (req, res) => {
   mongoose.connect(process.env.MONGO_URL);
-  const {token} = req.cookies;
-  if (token) {
-    jwt.verify(token, jwtSecret, {}, async (err, userData) => {
-      if (err) throw err;
-      const {name,email,_id} = await User.findById(userData.id);
-      res.json({name,email,_id});
-    });
-  } else {
-    res.json(null);
+  const { token } = req.cookies;
+  try {
+    if (token) {
+      const userData = await jwt.verify(token, jwtSecret, {});
+      const { name, email, _id } = await User.findById(userData.id);
+      res.json({ name, email, _id });
+    } else {
+      res.json(null);
+    }
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-app.post('/api/logout', (req,res) => {
+
+app.post('/logout', (req,res) => {
   res.cookie('token', '').json(true);
 });
 
 
-app.post('/api/upload-by-link', async (req,res) => {
+app.post('/upload-by-link', async (req,res) => {
   const {link} = req.body;
   const newName = 'photo' + Date.now() + '.jpg';
   await imageDownloader.image({
@@ -141,7 +159,7 @@ app.post('/api/upload-by-link', async (req,res) => {
 });
 
 const photosMiddleware = multer({dest:'/tmp'});
-app.post('/api/upload', photosMiddleware.array('photos', 100), async (req,res) => {
+app.post('/upload', photosMiddleware.array('photos', 100), async (req,res) => {
   const uploadedFiles = [];
   for (let i = 0; i < req.files.length; i++) {
     const {path,originalname,mimetype} = req.files[i];
@@ -151,7 +169,7 @@ app.post('/api/upload', photosMiddleware.array('photos', 100), async (req,res) =
   res.json(uploadedFiles);
 });
 
-app.post('/api/places', (req,res) => {
+app.post('/places', (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const {token} = req.cookies;
   const {
@@ -169,23 +187,41 @@ app.post('/api/places', (req,res) => {
   });
 });
 
-app.get('/api/user-places', (req,res) => {
-  mongoose.connect(process.env.MONGO_URL);
-  const {token} = req.cookies;
-  jwt.verify(token, jwtSecret, {}, async (err, userData) => {
-    const {id} = userData;
-    res.json( await Place.find({owner:id}) );
-  });
+
+app.get('/user-places', async (req, res) => {
+  try {
+    // Connect to the database
+    await mongoose.connect(process.env.MONGO_URL);
+
+    const { token } = req.cookies;
+
+    // Verify the JWT token
+    const userData = jwt.verify(token, jwtSecret);
+
+    // Destructure the user ID from userData
+    const { id } = userData;
+
+    // Fetch places owned by the user
+    const userPlaces = await Place.find({ owner: id });
+
+    // Close the database connection
+    await mongoose.connection.close();
+
+    // Send the places as a JSON response
+    res.json(userPlaces);
+  } catch (error) {
+    // Handle errors
+    console.error('Error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
-
-
-app.get('/api/places/:id', async (req,res) => {
+app.get('/places/:id', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const {id} = req.params;
   res.json(await Place.findById(id));
 });
 
-app.put('/api/places', async (req,res) => {
+app.put('/places', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const {token} = req.cookies;
   const {
@@ -206,12 +242,12 @@ app.put('/api/places', async (req,res) => {
   });
 });
 
-app.get('/api/places', async (req,res) => {
+app.get('/places', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   res.json( await Place.find() );
 });
 
-app.post('/api/bookings', async (req, res) => {
+app.post('/bookings', async (req, res) => {
   mongoose.connect(process.env.MONGO_URL);
   const userData = await getUserDataFromReq(req);
   const {
@@ -229,10 +265,24 @@ app.post('/api/bookings', async (req, res) => {
 
 
 
-app.get('/api/bookings', async (req,res) => {
+app.get('/bookings', async (req,res) => {
   mongoose.connect(process.env.MONGO_URL);
   const userData = await getUserDataFromReq(req);
   res.json( await Booking.find({user:userData.id}).populate('place') );
 });
 
-app.listen(4000);
+// Close MongoDB connection when the application is closing
+process.on('SIGINT', async () => {
+  try {
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed.');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error closing MongoDB connection:', err);
+    process.exit(1);
+  }
+});
+
+app.listen(4000, () => {
+  console.log(`Server is running on port 4000`);
+});
